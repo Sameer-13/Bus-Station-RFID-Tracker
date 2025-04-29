@@ -28,7 +28,7 @@ def connect_wifi():
             time.sleep(0.5)
     print("Connected. IP:", wlan.ifconfig()[0])
 
-# 🔄 Firebase update URL
+# Firebase update URL
 FIREBASE_BASE_URL = "https://rfid-scan-demo-default-rtdb.europe-west1.firebasedatabase.app/scans.json"
 
 # Update Firebase with custom payload
