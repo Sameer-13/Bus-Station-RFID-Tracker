@@ -7,11 +7,10 @@ import ujson
 import time
 
 np = neopixel.NeoPixel(Pin(48), 1)
-# 🔧 Wi-Fi credentials
+
+# Wi-Fi credentials
 SSID = "Muath"
 PASSWORD = "Camry1423"
-
-
 
 # Setup SPI and RFID reader
 spi = SPI(2, baudrate=1000000, polarity=0, phase=0,
@@ -29,18 +28,21 @@ def connect_wifi():
             time.sleep(0.5)
     print("Connected. IP:", wlan.ifconfig()[0])
 
+# 🔄 Firebase update URL
+FIREBASE_BASE_URL = "https://rfid-scan-demo-default-rtdb.europe-west1.firebasedatabase.app/scans.json"
 
-FIREBASE_URL = "https://rfid-scan-demo-default-rtdb.europe-west1.firebasedatabase.app/scans.json"
-# Send UID to webhook.site
-def send_uid_to_firebase(uid):
+# Update Firebase with custom payload
+def update_firebase(status, card_id):
     try:
+        url = f"{FIREBASE_BASE_URL}/bus-station-1.json"
         payload = {
-            "uid": uid,
-            "timestamp": time.time()
+            "ID": "01",
+            "status": status,
+            "card_ID": card_id
         }
         headers = {"Content-Type": "application/json"}
-        res = urequests.post(FIREBASE_URL, data=ujson.dumps(payload), headers=headers)
-        print("✅ Sent to Firebase:", res.status_code)
+        res = urequests.put(url, data=ujson.dumps(payload), headers=headers)
+        print(f"✅ Firebase updated | Status: {status} | Card ID: {card_id}")
         res.close()
     except Exception as e:
         print("❌ Firebase error:", e)
@@ -48,20 +50,22 @@ def send_uid_to_firebase(uid):
 # Main logic
 def run():
     connect_wifi()
-    
-    np = neopixel.NeoPixel(Pin(48), 1)  # Initialize RGB LED
     print("Ready to scan RFID cards...")
+
+    card_present = False  # Track whether a card is currently present
+
     while True:
-        
         (stat, tag_type) = rdr.request(rdr.REQIDL)
         if stat == rdr.OK:
             (stat, raw_uid) = rdr.anticoll()
             if stat == rdr.OK:
                 uid = "{:02x}{:02x}{:02x}{:02x}".format(*raw_uid)
-                print("Card detected:", uid)
 
-                # Send UID
-                send_uid_to_firebase(uid)
+                if not card_present:
+                    # Only send when new card is detected
+                    print("Card detected:", uid)
+                    update_firebase(status=1, card_id=uid)
+                    card_present = True
 
                 # Light up GREEN
                 np[0] = (0, 255, 0)
@@ -70,19 +74,20 @@ def run():
                 np[0] = (0, 0, 0)
                 np.write()
 
-                # Wait until card is removed before next read
+                # Wait until card is removed
                 while True:
                     stat, _ = rdr.request(rdr.REQIDL)
                     if stat != rdr.OK:
+                        print("Card removed.")
+                        update_firebase(status=0, card_id="")
+                        card_present = False
                         break
-                    time.sleep(0.2)  # Debounce delay
+                    time.sleep(0.2)
 
+        # RED heartbeat LED
         np[0] = (255, 0, 0)
         np.write()
         time.sleep(0.1)
 
-        
-# Run everything
+# Start the program
 run()
-
-
