@@ -32,17 +32,18 @@ def connect_wifi():
 FIREBASE_BASE_URL = "https://rfid-scan-demo-default-rtdb.europe-west1.firebasedatabase.app/scans.json"
 
 # Update Firebase with custom payload
-def update_firebase(status, card_id):
+def update_firebase(status, card_id, station_number):
     try:
-        url = f"{FIREBASE_BASE_URL}/bus-station-1.json"
+        url = f"{FIREBASE_BASE_URL}"
         payload = {
-            "ID": "01",
-            "status": status,
-            "card_ID": card_id
+            f"bus_station_{station_number}": {
+                "status": status,
+                "card_id": card_id
+            }
         }
         headers = {"Content-Type": "application/json"}
-        res = urequests.put(url, data=ujson.dumps(payload), headers=headers)
-        print(f"✅ Firebase updated | Status: {status} | Card ID: {card_id}")
+        res = urequests.patch(url, data=ujson.dumps(payload), headers=headers)
+        print(f"✅ Firebase updated | Station: {station_number} | Status: {status} | Card ID: {card_id}")
         res.close()
     except Exception as e:
         print("❌ Firebase error:", e)

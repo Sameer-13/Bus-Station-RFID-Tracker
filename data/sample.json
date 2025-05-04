@@ -1,16 +1,13 @@
 {
-    "bus1": {
-        "ID": "01",
+    "bus_station_1": {
         "status": 1,
         "card_ID": "1234567890"
     },
-    "bus2": {
-        "ID": "02",
+    "bus_station_2": {
         "status": 0,
         "card_ID": "None"
     },
-    "bus3": {
-        "ID": "03",
+    "bus_station_3": {
         "status": 1,
         "card_ID": "0987654321"
     }
