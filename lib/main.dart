@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:async';
 
 void main() {
   runApp(MyApp());
@@ -25,12 +28,14 @@ class BusStation {
   final String name;
   final LatLng position;
   int status; // 0 = inactive (red), 1 = active (green)
+  String cardId; // Card ID from the scanned data
 
   BusStation({
     required this.id,
     required this.name,
     required this.position,
     required this.status,
+    this.cardId = '',
   });
 }
 
@@ -41,66 +46,115 @@ class BusStationMap extends StatefulWidget {
 
 class _BusStationMapState extends State<BusStationMap> {
   final MapController _mapController = MapController();
+  Timer? _refreshTimer;
+  bool _isLoading = false;
+  String _errorMessage = '';
 
-  // Mock data for bus stations
+  // Bus stations with fixed positions
   List<BusStation> busStations = [
     BusStation(
-      id: '1',
+      id: 'bus_station_1',
       name: 'Bus Stop - Building 68',
       position: LatLng(26.3098367488067, 50.14397403444441),
-      status: 1, // Active
+      status: 0, // Will be updated from Firebase
     ),
     BusStation(
-      id: '2',
+      id: 'bus_station_2',
       name: 'Bus Stop - Building 59',
       position: LatLng(26.308351035468515, 50.1456451982045),
-      status: 0, // Inactive
+      status: 0, // Will be updated from Firebase
     ),
     BusStation(
-      id: '3',
+      id: 'bus_station_3',
       name: 'Bus Stop - Building 76',
       position: LatLng(26.30621698062467, 50.147710435437155),
-      status: 1, // Active
+      status: 0, // Will be updated from Firebase
     ),
   ];
 
   @override
   void initState() {
     super.initState();
-    // In a real app, you would fetch data here
-    // fetchBusStations();
-  }
+    // Start fetching data immediately
+    fetchBusStationStatus();
 
-  // This simulates fetching data from a database
-  Future<void> fetchBusStations() async {
-    // In a real app, this would be an API call or database query
-    // After fetching, call setState to rebuild with new data
-    setState(() {});
-  }
-
-  // Function to update a station's status
-  void updateStationStatus(String stationId, int newStatus) {
-    setState(() {
-      for (var i = 0; i < busStations.length; i++) {
-        if (busStations[i].id == stationId) {
-          busStations[i].status = newStatus;
-          break;
-        }
-      }
+    // Set up timer to refresh every second
+    _refreshTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      fetchBusStationStatus();
     });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  // Fetch bus station status from Firebase
+  Future<void> fetchBusStationStatus() async {
+    if (_isLoading) return; // Prevent overlapping requests
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://rfid-scan-demo-default-rtdb.europe-west1.firebasedatabase.app/scans.json'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        if (data != null) {
+          // The data comes directly under /scans node
+          final scans = data as Map<String, dynamic>;
+
+          setState(() {
+            for (var station in busStations) {
+              if (scans.containsKey(station.id)) {
+                station.status = scans[station.id]['status'] ?? 0;
+                station.cardId = scans[station.id]['card_id'] ?? '';
+              }
+            }
+          });
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to load data: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   // Custom marker widget based on status
   Widget _buildMarker(BusStation station) {
     return GestureDetector(
       onTap: () {
-        // Show some information about the station
+        // Show detailed information about the station
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: Text(station.name),
-            content:
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text('Status: ${station.status == 1 ? "Active" : "Inactive"}'),
+                if (station.cardId.isNotEmpty)
+                  Text('Card ID: ${station.cardId}'),
+              ],
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -127,7 +181,7 @@ class _BusStationMapState extends State<BusStationMap> {
         ),
         child: Center(
           child: Text(
-            station.id,
+            station.id.split('_').last, // Show only the number
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -144,37 +198,68 @@ class _BusStationMapState extends State<BusStationMap> {
       appBar: AppBar(
         title: Text('Bus Station Status'),
         actions: [
+          if (_isLoading)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: () {
-              // For demo, toggle the status of station 2
-              updateStationStatus('2', busStations[1].status == 1 ? 0 : 1);
-            },
+            onPressed: fetchBusStationStatus,
           ),
         ],
       ),
-      body: FlutterMap(
-        mapController: _mapController,
-        options: MapOptions(
-          center: LatLng(26.30850316046787,
-              50.142878441584955), // Center of your map == KFUPM Tower
-          zoom: 13.0,
-        ),
+      body: Stack(
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.example.app',
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              center:
+                  LatLng(26.30850316046787, 50.142878441584955), // KFUPM Tower
+              zoom: 15.0,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.app',
+              ),
+              MarkerLayer(
+                markers: busStations
+                    .map((station) => Marker(
+                          point: station.position,
+                          width: 30,
+                          height: 30,
+                          child: _buildMarker(station),
+                        ))
+                    .toList(),
+              ),
+            ],
           ),
-          MarkerLayer(
-            markers: busStations
-                .map((station) => Marker(
-                      point: station.position,
-                      width: 30,
-                      height: 30,
-                      child: _buildMarker(station),
-                    ))
-                .toList(),
-          ),
+          if (_errorMessage.isNotEmpty)
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _errorMessage,
+                  style: TextStyle(color: Colors.white),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
