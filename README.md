@@ -1,6 +1,6 @@
 # Bus Station Status Tracking System
 
-A real-time bus station tracking system built with Flutter (mobile app) and ESP32 microcontrollers with RFID readers. This system allows users to monitor the status of bus stations on a map and tracks when RFID cards are scanned at each station.
+A real-time bus station tracking system built with Flutter (mobile app) and ESP32 microcontrollers with RFID readers. This system allows users to monitor the status of bus stations on a map and track when RFID cards are scanned at each station through a mobile application.
 
 ## System Overview
 
@@ -9,7 +9,7 @@ This project consists of two main components:
 1. **Mobile Application**: A Flutter app that displays a map with the status of each bus station, updating in real-time.
 2. **ESP32 RFID Stations**: Physical stations with ESP32 microcontrollers and RFID readers that detect when cards are scanned.
 
-Data is synchronized through Firebase Realtime Database, allowing for instant updates between the hardware stations and the mobile app.
+Data is synchronised through Firebase Realtime Database, allowing for instant updates between the hardware stations and the mobile app.
 
 ## Application Overveiw:
 
