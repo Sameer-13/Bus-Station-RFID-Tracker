@@ -12,8 +12,9 @@ This project consists of two main components:
 Data is synchronized through Firebase Realtime Database, allowing for instant updates between the hardware stations and the mobile app.
 
 ## Application Overveiw:
-![WhatsApp Image 2025-05-12 at 19 04 58_428799a7](https://github.com/user-attachments/assets/79523b8f-e97f-4245-827a-61a670acfd53)
-![WhatsApp Image 2025-05-12 at 19 04 57_9543047b](https://github.com/user-attachments/assets/0f760d45-f1c9-4e28-880f-9e56d092c6d4)
+
+<img src="https://github.com/user-attachments/assets/79523b8f-e97f-4245-827a-61a670acfd53" alt="Image1" width="400"/>
+<img src="https://github.com/user-attachments/assets/0f760d45-f1c9-4e28-880f-9e56d092c6d4" alt="Image1" width="400"/>
 
 
 ## Features
