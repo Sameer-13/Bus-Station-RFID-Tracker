@@ -14,6 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Bus Station Status Map',
+      debugShowCheckedModeBanner: false, // Remove debug banner
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -50,6 +51,29 @@ class _BusStationMapState extends State<BusStationMap> {
   bool _isLoading = false;
   String _errorMessage = '';
 
+  // Dictionary of valid bus IDs (card IDs)
+  final Map<String, String> validBusIds = {
+    'abcd1234': 'Bus 1',
+    'efgh5678': 'Bus 2',
+    'ijkl9012': 'Bus 3',
+    'mnop3456': 'Bus 4',
+    'qrst7890': 'Bus 5',
+  };
+
+  // Map to store last bus name for each station
+  final Map<String, String> lastBusAtStation = {
+    'bus_station_1': '',
+    'bus_station_2': '',
+    'bus_station_3': '',
+  };
+
+  // Map to store next bus arrival countdown for each station (in seconds)
+  final Map<String, int> nextBusArrival = {
+    'bus_station_1': 600, // 10 minutes
+    'bus_station_2': 600,
+    'bus_station_3': 600,
+  };
+
   // Bus stations with fixed positions
   List<BusStation> busStations = [
     BusStation(
@@ -81,6 +105,18 @@ class _BusStationMapState extends State<BusStationMap> {
     // Set up timer to refresh every second
     _refreshTimer = Timer.periodic(Duration(seconds: 1), (timer) {
       fetchBusStationStatus();
+
+      // Update next bus arrival countdown
+      setState(() {
+        for (var stationId in nextBusArrival.keys) {
+          if (nextBusArrival[stationId]! > 0) {
+            nextBusArrival[stationId] = nextBusArrival[stationId]! - 1;
+          } else {
+            // Reset to 10 minutes when it reaches 0
+            nextBusArrival[stationId] = 600;
+          }
+        }
+      });
     });
   }
 
@@ -115,8 +151,20 @@ class _BusStationMapState extends State<BusStationMap> {
           setState(() {
             for (var station in busStations) {
               if (scans.containsKey(station.id)) {
-                station.status = scans[station.id]['status'] ?? 0;
-                station.cardId = scans[station.id]['card_id'] ?? '';
+                final cardId = scans[station.id]['card_id'] ?? '';
+
+                // Only update status if the card ID is valid
+                if (cardId.isNotEmpty && validBusIds.containsKey(cardId)) {
+                  station.status = scans[station.id]['status'] ?? 0;
+                  station.cardId = cardId;
+
+                  // Store the bus name associated with this card ID
+                  if (station.status == 1) {
+                    lastBusAtStation[station.id] = validBusIds[cardId]!;
+                    // Reset the next bus timer when a bus arrives
+                    nextBusArrival[station.id] = 600; // Reset to 10 minutes
+                  }
+                }
               }
             }
           });
@@ -146,15 +194,47 @@ class _BusStationMapState extends State<BusStationMap> {
           context: context,
           builder: (context) => AlertDialog(
             title: Text(station.name),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Status: ${station.status == 1 ? "Active" : "Inactive"}'),
-                if (station.cardId.isNotEmpty)
-                  Text('Card ID: ${station.cardId}'),
-              ],
-            ),
+            content: StatefulBuilder(
+                builder: (BuildContext context, StateSetter setState) {
+              // Calculate minutes and seconds remaining
+              int minutes = nextBusArrival[station.id]! ~/ 60;
+              int seconds = nextBusArrival[station.id]! % 60;
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Status: ${station.status == 1 ? "Active" : "Inactive"}',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  Text(
+                      'Last Bus: ${lastBusAtStation[station.id]!.isEmpty ? "None" : lastBusAtStation[station.id]!}'),
+                  SizedBox(height: 8),
+                  Text('Next Bus Arrival:'),
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text('remaining'),
+                    ],
+                  ),
+                ],
+              );
+            }),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -196,7 +276,11 @@ class _BusStationMapState extends State<BusStationMap> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Bus Station Status'),
+        backgroundColor: Color(0xFF33a46e), // KFUPM green color
+        title: Text(
+          'KFUPM Bus Stations Monitoring Map',
+          style: TextStyle(fontSize: 14, color: Colors.white),
+        ),
         actions: [
           if (_isLoading)
             Padding(
@@ -211,7 +295,7 @@ class _BusStationMapState extends State<BusStationMap> {
               ),
             ),
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: Icon(Icons.refresh, color: Colors.white),
             onPressed: fetchBusStationStatus,
           ),
         ],
